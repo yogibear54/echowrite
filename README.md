@@ -12,6 +12,8 @@ A local Python application that captures voice input via global hotkeys, transcr
 - **Custom Vocabulary**: Supports custom vocabulary corrections for better recognition of technical terms
 - **Environment Configuration**: Configure settings via `.env` file
 - **Maximum Recording Duration**: Configurable limit to prevent excessive recordings
+- **Status Indicators**: Visual indicators for "recording..." and "processing..." modes
+- **Plugin System**: Extensible plugin architecture for custom status displays (e.g., i3 status bar integration)
 
 ## Requirements
 
@@ -106,6 +108,14 @@ REPLICATE_MODEL=vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac
 
 # Minimum recording duration in seconds (default: 1.0, min: 0.1)
 MIN_RECORDING_SECONDS=1.0
+
+# Status indicator plugins (comma-separated, default: i3status)
+# Available: i3status
+STATUS_PLUGINS=i3status
+
+# i3 status bar plugin configuration
+# Path to status file that i3bar will read (default: /tmp/voice2text_status)
+I3_STATUS_FILE=/tmp/voice2text_status
 ```
 
 ## Usage
@@ -345,12 +355,113 @@ API_SETTINGS = {
 
 **Note**: The model version tag is required. The default version is the latest stable version as of implementation.
 
+### Status Indicators & Plugin System
+
+The application includes a plugin-based status indicator system that shows the current state ("recording...", "processing...", or idle). This allows you to see the application status in external displays like i3 status bar.
+
+#### Built-in Plugins
+
+**i3 Status Bar Plugin** (`i3status`):
+- Writes status to a JSON file that i3bar can read
+- Shows "🔴 Recording..." in red when recording
+- Shows "🔄 Processing..." in orange when processing
+- Hides indicator when idle
+- Status file location: `/tmp/voice2text_status` (configurable)
+
+#### Configuring i3 Status Bar Integration
+
+1. **Enable the plugin** in your `.env` file (enabled by default):
+   ```env
+   STATUS_PLUGINS=i3status
+   I3_STATUS_FILE=/tmp/voice2text_status
+   ```
+
+2. **Configure i3bar** to read the status file. Add this to your i3 config (`~/.config/i3/config`):
+   ```bash
+   # Read voice2text status
+   bar {
+       status_command while :; do
+           if [ -f /tmp/voice2text_status ]; then
+               cat /tmp/voice2text_status | jq -c .
+           fi
+           sleep 1
+       done
+   }
+   ```
+
+   Or use a custom status script that reads the file and formats it for i3bar. The status file contains JSON in i3bar format:
+   ```json
+   {
+     "full_text": "🔴 Recording...",
+     "color": "#ff0000",
+     "name": "voice2text",
+     "instance": "voice2text"
+   }
+   ```
+
+#### Creating Custom Plugins
+
+You can create custom status indicator plugins by:
+
+1. **Create a new plugin file** in the `plugins/` directory (e.g., `plugins/myplugin.py`)
+2. **Inherit from `StatusPlugin`** base class:
+   ```python
+   from plugins.base import StatusPlugin
+   from status_manager import Status
+
+   class MyCustomPlugin(StatusPlugin):
+       def __init__(self):
+           # Initialize your plugin
+           pass
+       
+       def update_status(self, status: Status):
+           # Update your indicator based on status
+           if status == Status.RECORDING:
+               # Show recording indicator
+               pass
+           elif status == Status.PROCESSING:
+               # Show processing indicator
+               pass
+           else:  # IDLE
+               # Hide or reset indicator
+               pass
+       
+       def cleanup(self):
+           # Clean up resources on shutdown
+           pass
+   ```
+
+3. **Register your plugin** in `start.py`:
+   ```python
+   if 'myplugin' in config.STATUS_PLUGINS:
+       from plugins.myplugin import MyCustomPlugin
+       my_plugin = MyCustomPlugin()
+       self.status_manager.register_plugin(my_plugin)
+   ```
+
+4. **Enable it** in your `.env` file:
+   ```env
+   STATUS_PLUGINS=i3status,myplugin
+   ```
+
+The plugin system is designed to be extensible - you can create plugins for:
+- Desktop notifications (libnotify)
+- System tray icons
+- LED indicators
+- Web dashboards
+- Any other display mechanism you prefer
+
 ## Project Structure
 
 ```
 voice2text/
 ├── start.py              # Main application script (VoiceDictationTool class)
 ├── config.py             # Configuration settings with env variable support
+├── status_manager.py      # Status manager for tracking and broadcasting application state
+├── plugins/              # Status indicator plugins directory
+│   ├── __init__.py       # Plugin package initialization
+│   ├── base.py           # Base class for status indicator plugins
+│   └── i3status.py       # i3 status bar plugin
 ├── requirements.txt      # Python dependencies
 ├── .env.example          # Example environment variables file
 ├── .env                  # Your environment variables (create from .env.example)
@@ -366,6 +477,10 @@ voice2text/
 
 - **`start.py`**: Main application containing `VoiceDictationTool` class with all core functionality
 - **`config.py`**: Configuration management with environment variable support and validation
+- **`status_manager.py`**: Status manager that tracks application state and notifies registered plugins
+- **`plugins/`**: Directory containing status indicator plugins
+  - **`base.py`**: Base class (`StatusPlugin`) that all plugins must inherit from
+  - **`i3status.py`**: Plugin for i3 status bar integration
 - **`run.sh`**: Helper script for Linux that automatically uses sudo with the correct Python path
 - **`recordings.json`**: JSON file storing all transcription history with timestamps
 - **`temp/`**: Directory for temporary WAV files (automatically cleaned up after processing)
@@ -465,6 +580,35 @@ sudo venv/bin/python start.py
 ```
 
 Or use the helper script: `./run.sh`
+
+### Status Indicator Not Showing in i3 Bar
+
+If the status indicator doesn't appear in your i3 status bar:
+
+1. **Check that the plugin is enabled**:
+   ```bash
+   grep STATUS_PLUGINS .env
+   # Should show: STATUS_PLUGINS=i3status
+   ```
+
+2. **Verify the status file is being created**:
+   ```bash
+   # While the app is running and recording/processing
+   cat /tmp/voice2text_status
+   # Should show JSON with status information
+   ```
+
+3. **Check i3bar configuration**: Make sure your i3bar is configured to read the status file (see Status Indicators & Plugin System section above)
+
+4. **Check file permissions**: The status file should be readable by your user:
+   ```bash
+   ls -l /tmp/voice2text_status
+   ```
+
+5. **Check plugin initialization**: When starting the app, you should see:
+   ```
+   ✓ i3 status plugin enabled (status file: /tmp/voice2text_status)
+   ```
 
 ## How It Works (Detailed)
 
@@ -578,6 +722,7 @@ Or use the helper script: `./run.sh`
 3. **Version Tag Required**: Model name must include version tag for API compatibility
 4. **Threading for Recording**: Separate thread allows responsive stopping without blocking
 5. **Environment Variables**: All configurable values support .env overrides with validation
+6. **Plugin Architecture**: Status indicators use a plugin system for extensibility, allowing users to create custom displays
 
 ### Known Issues & Workarounds
 

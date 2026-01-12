@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from scipy.io.wavfile import write as wav_write
 
 import config
+from status_manager import StatusManager, Status
 
 # Load environment variables
 load_dotenv()
@@ -43,6 +44,18 @@ class VoiceDictationTool:
         if not self.recordings_file.exists():
             with open(self.recordings_file, 'w') as f:
                 json.dump([], f)
+        
+        # Initialize status manager
+        self.status_manager = StatusManager()
+        # Register plugins based on config
+        if 'i3status' in config.STATUS_PLUGINS:
+            try:
+                from plugins.i3status import I3StatusPlugin
+                i3_plugin = I3StatusPlugin(config.I3_STATUS_FILE)
+                self.status_manager.register_plugin(i3_plugin)
+                print(f"✓ i3 status plugin enabled (status file: {config.I3_STATUS_FILE})")
+            except Exception as e:
+                print(f"⚠️  Failed to initialize i3 status plugin: {e}")
     
     def select_audio_device(self) -> Optional[int]:
         """Interactive device selection at startup."""
@@ -155,6 +168,7 @@ class VoiceDictationTool:
                         if elapsed >= config.MAX_RECORDING_SECONDS:
                             self.is_recording = False
                             print(f"⏱️  Maximum recording duration reached ({config.MAX_RECORDING_MINUTES} minutes)")
+                            self.status_manager.set_status(Status.PROCESSING)
                             break
                     
                     chunk, overflowed = stream.read(int(sample_rate * chunk_duration))
@@ -352,6 +366,7 @@ class VoiceDictationTool:
         """Process the recorded audio: save, transcribe, and paste."""
         if self.audio_data is None or len(self.audio_data) == 0:
             print("⚠️  No audio data recorded")
+            self.status_manager.set_status(Status.IDLE)
             return
         
         # Calculate duration
@@ -361,6 +376,7 @@ class VoiceDictationTool:
         # Check minimum duration
         if duration < config.MIN_RECORDING_SECONDS:
             print(f"⚠️  Recording too short ({duration:.2f}s). Minimum is {config.MIN_RECORDING_SECONDS}s.")
+            self.status_manager.set_status(Status.IDLE)
             return
         
         # Generate temp filename
@@ -399,6 +415,8 @@ class VoiceDictationTool:
                     temp_filename.unlink()
             except Exception as e:
                 print(f"⚠️  Failed to delete temp file: {e}")
+            # Reset status to idle
+            self.status_manager.set_status(Status.IDLE)
     
     def _on_key_event(self, event):
         """Handle keyboard events for hotkey detection."""
@@ -418,6 +436,7 @@ class VoiceDictationTool:
                 self.is_recording = True
                 self.recording_start_time = time.time()
                 print("🔴 Recording started... (Release Ctrl+Alt to stop)")
+                self.status_manager.set_status(Status.RECORDING)
                 
                 # Start recording in a separate thread
                 self.recording_thread = threading.Thread(target=self._record_audio, daemon=True)
@@ -433,6 +452,7 @@ class VoiceDictationTool:
             if self.is_recording and (not self.ctrl_pressed or not self.alt_pressed):
                 self.is_recording = False
                 print("⏹️  Recording stopped. Processing...")
+                self.status_manager.set_status(Status.PROCESSING)
                 
                 # Wait for recording thread to finish
                 if self.recording_thread:
@@ -475,6 +495,7 @@ class VoiceDictationTool:
             print("\n\n👋 Shutting down...")
         finally:
             # Clean up
+            self.status_manager.cleanup()
             keyboard.unhook_all()
 
 

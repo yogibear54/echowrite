@@ -95,3 +95,10 @@ if MIN_RECORDING_SECONDS >= MAX_RECORDING_SECONDS:
     print(f"⚠️  Warning: MIN_RECORDING_SECONDS ({MIN_RECORDING_SECONDS}) >= MAX_RECORDING_SECONDS ({MAX_RECORDING_SECONDS})")
     print(f"   Adjusting MIN_RECORDING_SECONDS to {MAX_RECORDING_SECONDS * 0.1}")
     MIN_RECORDING_SECONDS = MAX_RECORDING_SECONDS * 0.1
+
+# Status indicator plugin configuration
+STATUS_PLUGINS = _get_str_env('STATUS_PLUGINS', 'i3status').split(',')
+STATUS_PLUGINS = [p.strip() for p in STATUS_PLUGINS if p.strip()]
+
+# i3 status plugin configuration
+I3_STATUS_FILE = _get_str_env('I3_STATUS_FILE', '/tmp/voice2text_status')
