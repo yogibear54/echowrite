@@ -441,6 +441,12 @@ def transcribe(self, audio_file_path: str) -> Optional[str]:
 
 ## Testing Your Provider
 
+The project includes comprehensive tests for the provider system. You can reference the existing test files for examples:
+
+- `tests/test_providers/test_base.py` - Tests for TranscriptionProvider base class
+- `tests/test_providers/test_replicate.py` - Tests for ReplicateProvider (unit tests with mocking)
+- `tests/test_providers/test_replicate_integration.py` - Tests for ReplicateProvider (real API tests)
+
 ### Unit Tests
 
 Create `tests/test_providers/test_your_provider.py`:
@@ -539,11 +545,37 @@ class TestYourProviderIntegration:
 ### Running Tests
 
 ```bash
+# Run all provider tests
+pytest tests/test_providers/
+
 # Run unit tests (mocked, fast)
 pytest tests/test_providers/test_your_provider.py
 
 # Run integration tests (real API, requires token)
 pytest tests/test_providers/test_your_provider_integration.py -m integration
+
+# Run with coverage
+pytest tests/test_providers/ --cov=providers --cov-report=term-missing
+```
+
+### Test Fixtures
+
+The test suite provides helpful fixtures in `tests/conftest.py`:
+
+- `test_audio_file` - Temporary WAV file for testing transcription
+- `mock_api_token` - Mock API token for testing
+- `mock_api_settings` - Mock API settings
+- `replicate_provider` - Example provider instance (can be adapted for your provider)
+- `temp_dir` - Temporary directory for test files
+
+You can use these fixtures in your tests:
+
+```python
+def test_my_provider(test_audio_file, mock_api_token):
+    """Test my provider with test audio file."""
+    provider = MyProvider(api_token=mock_api_token)
+    result = provider.transcribe(str(test_audio_file))
+    # ... test implementation
 ```
 
 ## Best Practices
@@ -685,9 +717,10 @@ Before submitting your provider, ensure:
 If you encounter issues:
 
 1. Check existing providers (`providers/replicate.py`) for reference
-2. Review test examples (`tests/test_providers/test_replicate.py`)
+2. Review test examples (`tests/test_providers/`) - comprehensive test suite with 30+ tests
 3. Check the base class interface (`providers/base.py`)
 4. Review this documentation
+5. Run the test suite to verify your provider works correctly: `pytest tests/test_providers/`
 
 ## Contributing
 

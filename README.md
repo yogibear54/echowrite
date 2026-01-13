@@ -851,12 +851,12 @@ pytest -m integration
 #### Run Tests with Coverage Report
 
 ```bash
-./run_tests.sh --cov=providers --cov=start --cov-report=html
+./run_tests.sh --cov=providers --cov=start --cov=status_manager --cov=plugins --cov-report=html
 ```
 
 Or with activated venv:
 ```bash
-pytest --cov=providers --cov=start --cov-report=html
+pytest --cov=providers --cov=start --cov=status_manager --cov=plugins --cov-report=html
 ```
 
 This generates an HTML coverage report in `htmlcov/index.html`.
@@ -869,6 +869,9 @@ This generates an HTML coverage report in `htmlcov/index.html`.
 
 # Test audio functionality only
 ./run_tests.sh tests/test_audio/
+
+# Test status plugins only
+./run_tests.sh tests/test_plugins/
 
 # Test integration/workflow only
 ./run_tests.sh tests/test_integration/
@@ -904,6 +907,10 @@ tests/
   ├── test_audio/
   │   ├── test_recording.py    # Audio recording logic tests
   │   └── test_file_handling.py # WAV file save/load tests
+  ├── test_plugins/
+  │   ├── test_status_manager.py  # StatusManager tests
+  │   ├── test_base.py            # StatusPlugin base class tests
+  │   └── test_i3status.py        # I3StatusPlugin implementation tests
   ├── test_integration/
   │   └── test_full_workflow.py # End-to-end workflow tests
   └── fixtures/
@@ -919,7 +926,8 @@ The test suite covers:
 - **File Operations**: WAV saving, format conversion, cleanup
 - **Paste Functionality**: Clipboard operations, paste triggering
 - **Vocabulary Corrections**: Text correction logic
-- **Error Handling**: Network errors, API errors, file errors
+- **Status Plugin System**: StatusManager, StatusPlugin base class, I3StatusPlugin implementation
+- **Error Handling**: Network errors, API errors, file errors, plugin errors
 - **Integration**: End-to-end workflow validation
 
 ### Test Types
@@ -932,6 +940,7 @@ Fast tests that use mocking for external dependencies:
 - Audio data processing
 - File I/O operations
 - Vocabulary corrections
+- Status manager and plugin system
 
 Run with: `pytest -m "not integration"`
 

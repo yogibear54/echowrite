@@ -494,6 +494,12 @@ YOUR_PLUGIN_OPTION=default_value
 
 ## Testing Your Plugin
 
+The project includes comprehensive tests for the status plugin system. You can reference the existing test files for examples:
+
+- `tests/test_plugins/test_status_manager.py` - Tests for StatusManager (plugin registration, status updates, cleanup)
+- `tests/test_plugins/test_base.py` - Tests for StatusPlugin base class
+- `tests/test_plugins/test_i3status.py` - Tests for I3StatusPlugin (file operations, status updates, error handling)
+
 ### Unit Tests
 
 Create `tests/test_plugins/test_your_plugin.py`:
@@ -586,11 +592,35 @@ class TestYourStatusPluginIntegration:
 ### Running Tests
 
 ```bash
+# Run all plugin tests
+pytest tests/test_plugins/
+
 # Run unit tests (mocked, fast)
 pytest tests/test_plugins/test_your_plugin.py
 
 # Run integration tests (real system interactions)
 pytest tests/test_plugins/test_your_plugin.py -m integration
+
+# Run with coverage
+pytest tests/test_plugins/ --cov=plugins --cov-report=term-missing
+```
+
+### Test Fixtures
+
+The test suite provides helpful fixtures in `tests/conftest.py`:
+
+- `temp_status_file` - Temporary file path for testing file-based plugins
+- `mock_plugin` - Mock plugin with `update_status` and `cleanup` methods
+- `incomplete_plugin` - Mock plugin without `update_status` method (for testing error cases)
+- `temp_dir` - Temporary directory for test files
+
+You can use these fixtures in your tests:
+
+```python
+def test_my_plugin(temp_status_file):
+    """Test my plugin with temporary file."""
+    plugin = MyPlugin(str(temp_status_file))
+    # ... test implementation
 ```
 
 ## Best Practices
@@ -776,9 +806,10 @@ Before submitting your plugin, ensure:
 If you encounter issues:
 
 1. Check existing plugins (`plugins/i3status/`) for reference
-2. Review test examples (`tests/test_plugins/`)
+2. Review test examples (`tests/test_plugins/`) - comprehensive test suite with 40+ tests
 3. Check the base class interface (`plugins/base.py`)
 4. Review `StatusManager` implementation (`status_manager.py`)
+5. Run the test suite to verify your plugin works correctly: `pytest tests/test_plugins/`
 5. Review this documentation
 
 ## Contributing
