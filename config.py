@@ -54,7 +54,11 @@ RECORDING_SETTINGS = {
     'dtype': 'float32'  # float32 is more widely supported than float64
 }
 
-# Replicate API settings with environment variable overrides
+# Transcription provider selection
+PROVIDER = _get_str_env('TRANSCRIPTION_PROVIDER', 'replicate').lower()
+
+# Provider-specific API settings with environment variable overrides
+# These settings are provider-agnostic but may be used differently by each provider
 API_SETTINGS = {
     'model': _get_str_env('REPLICATE_MODEL', 'vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c'),
     # Model parameters (optional, defaults are usually optimal)
