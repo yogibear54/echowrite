@@ -5,6 +5,7 @@ A local Python application that captures voice input via global hotkeys, transcr
 ## Features
 
 - **Global Hotkey Support**: Press and hold Ctrl+Alt to start recording, release to stop (works even when the app isn't focused)
+- **Recording Cancellation**: Press Escape during recording to cancel and discard without processing
 - **Device Selection**: Interactive audio device selection at startup
 - **Fast Transcription**: Uses Replicate's incredibly-fast-whisper model (transcribes 150 minutes in ~100 seconds)
 - **Automatic Pasting**: Transcribed text is automatically copied to clipboard and pasted at cursor position
@@ -172,6 +173,7 @@ python start.py
    - Press and **hold** Ctrl+Alt to start recording
    - Speak your text
    - **Release** Ctrl+Alt to stop recording and process
+   - Press **Escape** during recording to cancel and discard without processing
    - The transcribed text will automatically appear at your cursor position
 
 5. **Exit the application**: Press Ctrl+C in the terminal
@@ -197,9 +199,15 @@ User Presses Ctrl+Alt (both down)
     ↓
 Start Audio Recording Thread (Using Selected Device)
     ↓
-User Releases Ctrl+Alt (key-up event)
-    ↓
-Stop Recording & Save to temp WAV file
+    ├─→ User Releases Ctrl+Alt (key-up event)
+    │   ↓
+    │   Stop Recording & Save to temp WAV file
+    │
+    └─→ User Presses Escape (cancel)
+        ↓
+        Stop Recording & Discard Audio Data
+        ↓
+        Return to Main Loop (no processing)
     ↓
 Validate Recording Duration (min 1 second)
     ↓
@@ -230,12 +238,15 @@ Clean Up Temp WAV File
 - Tracks Ctrl and Alt key states independently
 - Starts recording when both keys are pressed down
 - Stops recording when either key is released
+- Supports cancellation via Escape key during recording
 - Prevents duplicate recordings from rapid key presses
 
 **Implementation Details:**
 - Key events are normalized (handles 'ctrl', 'left ctrl', 'right ctrl', etc.)
 - Uses threading to avoid blocking the main loop
 - Recording thread runs as daemon thread
+- Cancellation: Pressing Escape during recording sets `is_cancelled` flag, stops recording, clears audio data, and skips processing
+- Cancellation state is reset when keys are released or a new recording starts
 
 #### 2. Audio Recording (`start.py` - `_record_audio()`)
 
@@ -666,7 +677,8 @@ If the status indicator doesn't appear in your i3 status bar:
 - Monitors all key press and release events
 - Tracks state of Ctrl and Alt keys independently
 - When both keys are pressed down simultaneously, starts recording
-- When either key is released, stops recording
+- When either key is released, stops recording and processes
+- Pressing Escape during recording cancels and discards the recording without processing
 
 ### 2. Audio Recording
 

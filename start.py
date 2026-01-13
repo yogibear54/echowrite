@@ -33,6 +33,7 @@ class VoiceDictationTool:
         self.ctrl_pressed = False
         self.alt_pressed = False
         self.recording_start_time = None
+        self.is_cancelled = False
         
         # Ensure temp directory exists
         self.temp_dir = Path(config.TEMP_DIR)
@@ -300,8 +301,23 @@ class VoiceDictationTool:
         key_name = event.name.lower() if event.name else ''
         is_ctrl = key_name in ['ctrl', 'left ctrl', 'right ctrl']
         is_alt = key_name in ['alt', 'left alt', 'right alt']
+        # Check for escape key with multiple possible names (Linux may use 'esc' instead of 'escape')
+        is_escape = key_name in ['escape', 'esc']
         
         if event.event_type == keyboard.KEY_DOWN:
+            # Handle Escape key cancellation during recording
+            if is_escape and self.is_recording and not self.is_cancelled:
+                self.is_cancelled = True
+                self.is_recording = False
+                print("❌ Recording cancelled")
+                self.status_manager.set_status(Status.IDLE)
+                self.audio_data = None  # Clear audio data to prevent processing
+                
+                # Wait for recording thread to finish
+                if self.recording_thread:
+                    self.recording_thread.join(timeout=2.0)
+                return
+            
             if is_ctrl:
                 self.ctrl_pressed = True
             elif is_alt:
@@ -310,8 +326,9 @@ class VoiceDictationTool:
             # Start recording when both keys are pressed
             if self.ctrl_pressed and self.alt_pressed and not self.is_recording:
                 self.is_recording = True
+                self.is_cancelled = False  # Reset cancellation flag for new recording
                 self.recording_start_time = time.time()
-                print("🔴 Recording started... (Release Ctrl+Alt to stop)")
+                print("🔴 Recording started... (Release Ctrl+Alt to stop, or press Escape to cancel)")
                 self.status_manager.set_status(Status.RECORDING)
                 
                 # Start recording in a separate thread
@@ -324,18 +341,28 @@ class VoiceDictationTool:
             elif is_alt:
                 self.alt_pressed = False
             
+            # Reset cancellation flag if keys are released after cancellation
+            if self.is_cancelled and not self.is_recording:
+                self.is_cancelled = False
+            
             # Stop recording when either key is released
             if self.is_recording and (not self.ctrl_pressed or not self.alt_pressed):
                 self.is_recording = False
-                print("⏹️  Recording stopped. Processing...")
-                self.status_manager.set_status(Status.PROCESSING)
                 
                 # Wait for recording thread to finish
                 if self.recording_thread:
                     self.recording_thread.join(timeout=2.0)
                 
-                # Process the recording
-                self._process_recording()
+                # Only process if not cancelled
+                if self.is_cancelled:
+                    # Reset cancellation flag for next recording
+                    self.is_cancelled = False
+                    # Status already set to IDLE in cancellation handler
+                else:
+                    print("⏹️  Recording stopped. Processing...")
+                    self.status_manager.set_status(Status.PROCESSING)
+                    # Process the recording
+                    self._process_recording()
     
     def start(self):
         """Start the voice dictation tool."""
@@ -358,6 +385,7 @@ class VoiceDictationTool:
         print("\n" + "=" * 60)
         print("✓ Ready! Press and hold Ctrl+Alt to start recording.")
         print("  Release Ctrl+Alt to stop recording and transcribe.")
+        print("  Press Escape during recording to cancel.")
         print("  Press Ctrl+C to exit.")
         print("=" * 60 + "\n")
         

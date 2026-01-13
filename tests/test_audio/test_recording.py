@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-import sounddevice as sd
 
 from start import VoiceDictationTool
 
@@ -248,3 +247,178 @@ class TestAudioRecording:
         # Should be 2D: (samples, channels)
         assert len(voice_tool.audio_data.shape) == 2
         assert voice_tool.audio_data.shape[1] == 1  # Mono channel
+    
+    def test_recording_cancelled_with_escape_key(self, voice_tool, mock_audio_data):
+        """Test recording cancelled with Escape key."""
+        import keyboard
+        from status_manager import Status
+        
+        # Mock status manager
+        mock_status_manager = MagicMock()
+        voice_tool.status_manager = mock_status_manager
+        
+        # Set up recording state
+        voice_tool.is_recording = True
+        voice_tool.is_cancelled = False
+        voice_tool.audio_data = mock_audio_data  # Some audio data exists
+        
+        # Create mock Escape key event
+        escape_event = MagicMock()
+        escape_event.name = 'escape'
+        escape_event.event_type = keyboard.KEY_DOWN
+        
+        # Simulate Escape key press
+        voice_tool._on_key_event(escape_event)
+        
+        # Verify cancellation
+        assert voice_tool.is_cancelled is True
+        assert voice_tool.is_recording is False
+        assert voice_tool.audio_data is None
+        mock_status_manager.set_status.assert_called_with(Status.IDLE)
+    
+    def test_cancelled_recording_not_processed(self, voice_tool):
+        """Test cancelled recordings don't trigger processing."""
+        import keyboard
+        
+        # Mock status manager and process_recording
+        mock_status_manager = MagicMock()
+        voice_tool.status_manager = mock_status_manager
+        voice_tool._process_recording = MagicMock()
+        
+        # Set up recording state
+        voice_tool.is_recording = True
+        voice_tool.is_cancelled = False
+        
+        # Cancel with Escape
+        escape_event = MagicMock()
+        escape_event.name = 'escape'
+        escape_event.event_type = keyboard.KEY_DOWN
+        voice_tool._on_key_event(escape_event)
+        
+        # Simulate key release (Ctrl or Alt)
+        ctrl_up_event = MagicMock()
+        ctrl_up_event.name = 'ctrl'
+        ctrl_up_event.event_type = keyboard.KEY_UP
+        voice_tool.ctrl_pressed = False
+        
+        # Process key up event
+        voice_tool._on_key_event(ctrl_up_event)
+        
+        # Verify processing was NOT called
+        voice_tool._process_recording.assert_not_called()
+        # Verify cancellation flag was reset
+        assert voice_tool.is_cancelled is False
+    
+    def test_cancelled_recording_clears_audio_data(self, voice_tool, mock_audio_data):
+        """Test cancelled recording clears audio data."""
+        import keyboard
+        
+        # Mock status manager
+        mock_status_manager = MagicMock()
+        voice_tool.status_manager = mock_status_manager
+        
+        # Set up recording with audio data
+        voice_tool.is_recording = True
+        voice_tool.audio_data = mock_audio_data
+        
+        # Cancel with Escape
+        escape_event = MagicMock()
+        escape_event.name = 'escape'
+        escape_event.event_type = keyboard.KEY_DOWN
+        voice_tool._on_key_event(escape_event)
+        
+        # Verify audio data is cleared
+        assert voice_tool.audio_data is None
+    
+    def test_cancel_resets_state_for_next_recording(self, voice_tool):
+        """Test cancellation state resets properly for next recording."""
+        import keyboard
+        
+        # Mock status manager
+        mock_status_manager = MagicMock()
+        voice_tool.status_manager = mock_status_manager
+        
+        # Cancel a recording
+        voice_tool.is_recording = True
+        escape_event = MagicMock()
+        escape_event.name = 'escape'
+        escape_event.event_type = keyboard.KEY_DOWN
+        voice_tool._on_key_event(escape_event)
+        
+        # Verify cancelled
+        assert voice_tool.is_cancelled is True
+        
+        # Simulate key release to reset cancellation flag
+        ctrl_up_event = MagicMock()
+        ctrl_up_event.name = 'ctrl'
+        ctrl_up_event.event_type = keyboard.KEY_UP
+        voice_tool.ctrl_pressed = False
+        voice_tool._on_key_event(ctrl_up_event)
+        
+        # Verify cancellation flag is reset
+        assert voice_tool.is_cancelled is False
+        
+        # Start a new recording
+        voice_tool.ctrl_pressed = True
+        voice_tool.alt_pressed = True
+        ctrl_down_event = MagicMock()
+        ctrl_down_event.name = 'ctrl'
+        ctrl_down_event.event_type = keyboard.KEY_DOWN
+        
+        # Mock recording thread
+        voice_tool.recording_thread = MagicMock()
+        voice_tool.recording_thread.start = MagicMock()
+        
+        with patch('start.threading.Thread'):
+            voice_tool._on_key_event(ctrl_down_event)
+        
+        # Verify new recording starts with cancellation flag reset
+        assert voice_tool.is_cancelled is False
+        assert voice_tool.is_recording is True
+    
+    def test_escape_ignored_when_not_recording(self, voice_tool):
+        """Test Escape key is ignored when not recording."""
+        import keyboard
+        
+        # Mock status manager
+        mock_status_manager = MagicMock()
+        voice_tool.status_manager = mock_status_manager
+        
+        # Not recording
+        voice_tool.is_recording = False
+        voice_tool.is_cancelled = False
+        
+        # Press Escape
+        escape_event = MagicMock()
+        escape_event.name = 'escape'
+        escape_event.event_type = keyboard.KEY_DOWN
+        voice_tool._on_key_event(escape_event)
+        
+        # Verify nothing changed
+        assert voice_tool.is_cancelled is False
+        assert voice_tool.is_recording is False
+        mock_status_manager.set_status.assert_not_called()
+    
+    def test_escape_ignored_when_already_cancelled(self, voice_tool):
+        """Test Escape key is ignored if already cancelled."""
+        import keyboard
+        
+        # Mock status manager
+        mock_status_manager = MagicMock()
+        voice_tool.status_manager = mock_status_manager
+        
+        # Already cancelled
+        voice_tool.is_recording = True
+        voice_tool.is_cancelled = True
+        
+        # Press Escape again
+        escape_event = MagicMock()
+        escape_event.name = 'escape'
+        escape_event.event_type = keyboard.KEY_DOWN
+        
+        # Should not change state
+        initial_state = voice_tool.is_cancelled
+        voice_tool._on_key_event(escape_event)
+        
+        # Verify state unchanged (still cancelled)
+        assert voice_tool.is_cancelled == initial_state
