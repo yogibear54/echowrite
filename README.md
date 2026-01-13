@@ -422,6 +422,8 @@ The application includes a plugin-based status indicator system that shows the c
 
 #### Creating Custom Plugins
 
+**📖 For detailed documentation on creating status plugins, see [NEW_STATUS_PLUGINS.md](NEW_STATUS_PLUGINS.md)**
+
 You can create custom status indicator plugins by:
 
 1. **Create a new plugin file** in the `plugins/` directory (e.g., `plugins/myplugin.py`)
@@ -472,6 +474,8 @@ The plugin system is designed to be extensible - you can create plugins for:
 - Web dashboards
 - Any other display mechanism you prefer
 
+**See [NEW_STATUS_PLUGINS.md](NEW_STATUS_PLUGINS.md) for a complete guide with examples, best practices, and troubleshooting.**
+
 ## Project Structure
 
 ```
@@ -505,6 +509,8 @@ voice2text/
 ├── recordings.json       # Transcription history (created automatically)
 ├── temp/                 # Temporary audio files directory
 ├── venv/                 # Virtual environment (created during setup)
+├── NEW_PROVIDERS.md      # Developer guide for creating new transcription providers
+├── NEW_STATUS_PLUGINS.md # Developer guide for creating new status plugins
 └── README.md             # This file
 ```
 
@@ -515,7 +521,9 @@ voice2text/
 - **`status_manager.py`**: Status manager that tracks application state and notifies registered plugins
 - **`plugins/`**: Directory containing status indicator plugins
   - **`base.py`**: Base class (`StatusPlugin`) that all plugins must inherit from
-  - **`i3status.py`**: Plugin for i3 status bar integration
+  - **`i3status/`**: Plugin for i3 status bar integration
+- **`NEW_PROVIDERS.md`**: Comprehensive developer guide for implementing new transcription providers
+- **`NEW_STATUS_PLUGINS.md`**: Comprehensive developer guide for implementing new status indicator plugins
 - **`run.sh`**: Helper script for Linux that automatically uses sudo with the correct Python path. **Requires sudo privileges** - it will prompt for your password to enable global keyboard hotkey detection.
 - **`run_tests.sh`**: Helper script that automatically runs pytest using the virtual environment's Python interpreter. This ensures tests use the correct Python environment and dependencies without requiring manual activation of the venv.
 - **`recordings.json`**: JSON file storing all transcription history with timestamps
