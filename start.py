@@ -35,6 +35,20 @@ class VoiceDictationTool:
         self.recording_start_time = None
         self.is_cancelled = False
         
+        # Paste key configuration - parse from config string (format: 'key1,key2,...')
+        self.paste_keys = config.PASTE_KEYS.split(',')
+        self.paste_mode_index = 0
+        self.available_paste_modes = [
+            ('ctrl', 'v'),           # Standard paste (Ctrl+V)
+            ('ctrl', 'shift', 'v'),  # Terminal paste (Ctrl+Shift+V)
+            ('ctrl', 'insert'),      # Alternative paste (Ctrl+Insert)
+        ]
+        # Set initial paste mode from config
+        for i, mode in enumerate(self.available_paste_modes):
+            if list(mode) == self.paste_keys:
+                self.paste_mode_index = i
+                break
+        
         # Ensure temp directory exists
         self.temp_dir = Path(config.TEMP_DIR)
         self.temp_dir.mkdir(exist_ok=True)
@@ -229,12 +243,33 @@ class VoiceDictationTool:
             pyperclip.copy(text)
             time.sleep(0.1)  # Small delay to ensure clipboard is ready
             
-            # Trigger paste
-            pyautogui.hotkey('ctrl', 'v')
+            # Trigger paste using current mode
+            current_mode = self.available_paste_modes[self.paste_mode_index]
+            pyautogui.hotkey(*current_mode)
             return True
         except Exception as e:
             print(f"⚠️  Failed to paste text: {e}")
             return False
+    
+    def cycle_paste_mode(self, direction: int = 1):
+        """Cycle through available paste modes.
+        
+        Args:
+            direction: 1 to go forward, -1 to go backward
+        """
+        self.paste_mode_index = (self.paste_mode_index + direction) % len(self.available_paste_modes)
+        current_mode = self.available_paste_modes[self.paste_mode_index]
+        mode_name = '+'.join(current_mode).upper()
+        # Clear entire line and print clean output (moves past trailing escape sequences)
+        print("\r\x1b[2K\r", end="")  # Move to start and clear entire line
+        print(f"🔄 Paste mode changed to: {mode_name}", flush=True)
+        self.status_manager.set_status(Status.IDLE)  # Brief status update
+    
+    def get_current_paste_mode(self) -> str:
+        """Get the current paste mode as a string for display."""
+        current_mode = self.available_paste_modes[self.paste_mode_index]
+        return '+'.join(current_mode).upper()
+    
     
     def _process_recording(self):
         """Process the recorded audio: save, transcribe, and paste."""
@@ -303,8 +338,26 @@ class VoiceDictationTool:
         is_alt = key_name in ['alt', 'left alt', 'right alt']
         # Check for escape key with multiple possible names (Linux may use 'esc' instead of 'escape')
         is_escape = key_name in ['escape', 'esc']
+        # Check for function keys for paste mode control
+        is_f1 = key_name in ['f1']
+        is_f2 = key_name in ['f2']
+        is_f3 = key_name in ['f3']
+        
+        
         
         if event.event_type == keyboard.KEY_DOWN:
+            # Handle function keys for paste mode control
+            if is_f1 and not self.is_recording:
+                self.cycle_paste_mode(1)  # Next mode
+                return
+            elif is_f2 and not self.is_recording:
+                self.cycle_paste_mode(-1)  # Previous mode
+                return
+            elif is_f3 and not self.is_recording:
+                # Clear entire line and print clean output (moves past trailing escape sequences)
+                print("\r\x1b[2K\r", end="")  # Move to start and clear entire line
+                print(f"📋 Current paste mode: {self.get_current_paste_mode()}", flush=True)
+                return
             # Handle Escape key cancellation during recording
             if is_escape and self.is_recording and not self.is_cancelled:
                 self.is_cancelled = True
@@ -336,6 +389,10 @@ class VoiceDictationTool:
                 self.recording_thread.start()
         
         elif event.event_type == keyboard.KEY_UP:
+            # Clear any trailing function key escape sequences
+            if is_f1 or is_f2 or is_f3:
+                print("\r\x1b[2K", end="", flush=True)  # Clear entire line
+                return
             if is_ctrl:
                 self.ctrl_pressed = False
             elif is_alt:
@@ -386,6 +443,9 @@ class VoiceDictationTool:
         print("✓ Ready! Press and hold Ctrl+Alt to start recording.")
         print("  Release Ctrl+Alt to stop recording and transcribe.")
         print("  Press Escape during recording to cancel.")
+        print(f"  Current paste mode: {self.get_current_paste_mode()}")
+        print("  Press F1/F2 to cycle through paste modes.")
+        print("  Press F3 to show current paste mode.")
         print("  Press Ctrl+C to exit.")
         print("=" * 60 + "\n")
         

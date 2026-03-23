@@ -11,6 +11,7 @@ A local Python application that captures voice input via global hotkeys, transcr
 - **Device Selection**: Interactive audio device selection at startup
 - **Fast Transcription**: Uses Replicate's incredibly-fast-whisper model (transcribes 150 minutes in ~100 seconds)
 - **Automatic Pasting**: Transcribed text is automatically copied to clipboard and pasted at cursor position
+- **Configurable Paste Modes**: Runtime paste key switching with F1/F2/F3 shortcuts (Ctrl+V, Ctrl+Shift+V, Ctrl+Insert)
 - **Recording History**: All transcriptions are saved to `recordings.json` with timestamps
 - **Custom Vocabulary**: Supports custom vocabulary corrections for better recognition of technical terms
 - **Environment Configuration**: Configure settings via `.env` file
@@ -124,6 +125,11 @@ STATUS_PLUGINS=i3status
 # i3 status bar plugin configuration
 # Path to status file that i3bar will read (default: /tmp/voice2text_status)
 I3_STATUS_FILE=/tmp/voice2text_status
+
+# Paste key configuration (default: ctrl,v)
+# Format: comma-separated keys, e.g., 'ctrl,v' or 'ctrl,shift,v' or 'ctrl,insert'
+# Available modes: ctrl+v (standard), ctrl+shift+v (terminal), ctrl+insert (alternative)
+PASTE_KEYS=ctrl,v
 ```
 
 ## Usage
@@ -167,7 +173,13 @@ sudo $(which python) start.py
    - Press **Escape** during recording to cancel and discard without processing
    - The transcribed text will automatically appear at your cursor position
 
-5. **Exit the application**: Press Ctrl+C in the terminal
+5. **Change paste mode for different applications**:
+   - Default paste mode: **Ctrl+V** (works in most applications)
+   - Press **F1** to switch to next paste mode (e.g., **Ctrl+Shift+V** for terminals)
+   - Press **F2** to cycle backward through modes
+   - Press **F3** to display current paste mode
+
+6. **Exit the application**: Press Ctrl+C in the terminal
 
 ## Architecture & Implementation
 
@@ -212,7 +224,7 @@ Receive Transcribed Text
     ↓
 Apply Vocabulary Corrections
     ↓
-Copy to Clipboard & Auto-Paste (Ctrl+V)
+Copy to Clipboard & Auto-Paste (using current paste mode - Ctrl+V by default, configurable via F1/F2/F3)
     ↓
 Save Transcription to recordings.json
     ↓
@@ -230,6 +242,7 @@ Clean Up Temp WAV File
 - Starts recording when both keys are pressed down
 - Stops recording when either key is released
 - Supports cancellation via Escape key during recording
+- Supports paste mode switching via F1 (next), F2 (previous), F3 (show current)
 - Prevents duplicate recordings from rapid key presses
 
 **Implementation Details:**
@@ -304,9 +317,12 @@ The application uses a provider-based architecture for transcription services:
 #### 7. Text Insertion (`start.py` - `_paste_text()`)
 
 - Copies text to clipboard using `pyperclip.copy()`
-- Triggers Ctrl+V using `pyautogui.hotkey('ctrl', 'v')`
+- Triggers paste using dynamically configured keys (default: Ctrl+V)
+- Supports multiple paste modes: Ctrl+V, Ctrl+Shift+V, Ctrl+Insert
+- Runtime mode switching via F1 (next), F2 (previous), F3 (show current)
 - Includes small delay to ensure clipboard is ready
 - Falls back gracefully if paste fails (text still saved to recordings.json)
+- Default paste mode configurable in `config.py` via `PASTE_KEYS`
 
 #### 8. Persistence (`start.py` - `_save_transcription()`)
 
@@ -346,6 +362,44 @@ CUSTOM_VOCABULARY = {
 ```
 
 The application will automatically correct common mispronunciations to your specified canonical terms using case-insensitive regex matching.
+
+### Paste Key Configuration
+
+The application supports three different paste key combinations that can be changed at runtime or set as default in `config.py`:
+
+**Available Paste Modes:**
+1. **Ctrl+V** (default) - Standard paste, works in most applications
+2. **Ctrl+Shift+V** - Terminal paste, required by some terminal emulators
+3. **Ctrl+Insert** - Alternative paste, works in some applications
+
+**Runtime Mode Switching:**
+- Press **F1** to cycle to the next paste mode
+- Press **F2** to cycle to the previous paste mode
+- Press **F3** to display the current paste mode
+- No restart needed - changes take effect immediately
+
+**Default Configuration:**
+You can set the default paste mode in `config.py`:
+
+```python
+# Format: comma-separated keys
+PASTE_KEYS = 'ctrl,v'          # Default: Ctrl+V (standard paste)
+# PASTE_KEYS = 'ctrl,shift,v'  # Default: Ctrl+Shift+V (terminal paste)
+# PASTE_KEYS = 'ctrl,insert'    # Default: Ctrl+Insert (alternative paste)
+```
+
+Or override via environment variable in `.env`:
+
+```env
+PASTE_KEYS=ctrl,shift,v
+```
+
+**Use Case Example:**
+- Use **Ctrl+V** when working in web browsers, text editors, office applications
+- Press **F1** to switch to **Ctrl+Shift+V** when working in terminal applications
+- Press **F2** to return to **Ctrl+V** when switching back to standard applications
+- The application confirms mode changes with console output like "🔄 Paste mode changed to: CTRL+SHIFT+V"
+
 
 ### Recording Settings
 
@@ -664,7 +718,7 @@ The application uses a provider-based architecture for transcription:
 
 - Vocabulary corrections are applied using regex
 - Text is copied to system clipboard
-- Auto-paste is triggered using Ctrl+V hotkey
+- Auto-paste is triggered using dynamically configured keys (default: Ctrl+V, changeable via F1/F2/F3)
 - Transcription is saved to JSON file with timestamp
 - Temporary WAV file is deleted
 
