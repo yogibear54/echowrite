@@ -69,6 +69,19 @@ API_SETTINGS = {
     'diarise_audio': False,  # Speaker diarization (requires hf_token if True)
 }
 
+# Local Whisper (faster-whisper) settings — used when PROVIDER=local_whisper
+# The model is loaded eagerly at startup, so the first recording is fast.
+# On first use faster-whisper downloads weights to ~/.cache/huggingface/hub/
+# (or /root/.cache/... when run with sudo); subsequent boots just read from disk.
+WHISPER_SETTINGS = {
+    'model_size': _get_str_env('WHISPER_MODEL_SIZE', 'small'),  # tiny | base | small | medium | large-v3 | large-v3-turbo
+    'device': _get_str_env('WHISPER_DEVICE', 'cpu'),            # cpu | cuda
+    'compute_type': _get_str_env('WHISPER_COMPUTE_TYPE', 'int8'),  # int8 | int8_float16 | float16 | float32
+    # None = auto-detect. Set to an ISO-639-1 code (e.g. 'en') to force a language.
+    'language': os.getenv('WHISPER_LANGUAGE') or None,
+    'beam_size': _get_int_env('WHISPER_BEAM_SIZE', 5, min_val=1, max_val=10),
+}
+
 # Hotkey configuration
 HOTKEY = 'ctrl+alt'
 

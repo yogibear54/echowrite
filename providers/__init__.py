@@ -26,12 +26,15 @@ def create_provider(provider_name: Optional[str] = None, api_settings: Optional[
     import config
     
     provider_name = (provider_name or config.PROVIDER).lower()
-    api_settings = api_settings or config.API_SETTINGS
-    
+
     if provider_name == 'replicate':
-        return ReplicateProvider(api_token=api_token, api_settings=api_settings)
+        return ReplicateProvider(api_token=api_token, api_settings=api_settings or config.API_SETTINGS)
+    elif provider_name == 'local_whisper':
+        # Lazy import: faster-whisper is an optional dependency
+        from .local_whisper import LocalWhisperProvider
+        return LocalWhisperProvider(api_token=api_token, api_settings=api_settings or config.WHISPER_SETTINGS)
     else:
         raise ValueError(
             f"Unknown transcription provider: '{provider_name}'. "
-            f"Available providers: replicate"
+            f"Available providers: replicate, local_whisper"
         )

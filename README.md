@@ -18,7 +18,7 @@ A local Python application that captures voice input via global hotkeys, transcr
 - **Maximum Recording Duration**: Configurable limit to prevent excessive recordings
 - **Status Indicators**: Visual indicators for "recording..." and "processing..." modes
 - **Plugin System**: Extensible plugin architecture for custom status displays (e.g., i3 status bar integration)
-- **Provider Architecture**: Extensible provider system supporting multiple transcription services (currently Replicate)
+- **Provider Architecture**: Extensible provider system supporting multiple transcription services (Replicate cloud API and local faster-whisper)
 - **Comprehensive Testing**: Full test suite with 60+ tests covering all major functionality
 
 ## Requirements
@@ -306,6 +306,53 @@ The application uses a provider-based architecture for transcription services:
 - The model requires a version tag (specific commit hash)
 - Audio must be uploaded first to get a URL (cannot pass file directly)
 - The API returns transcribed text in various formats (handled by provider)
+
+#### 5b. Local Whisper Integration (via LocalWhisperProvider)
+
+A fully offline alternative powered by [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) — no API key, no upload, no network calls per recording. The model runs **in-process** inside the Python app.
+
+**Enable it** in your `.env`:
+
+```env
+TRANSCRIPTION_PROVIDER=local_whisper
+WHISPER_MODEL_SIZE=small      # tiny | base | small | medium | large-v3 | large-v3-turbo
+WHISPER_DEVICE=cpu            # cpu | cuda
+WHISPER_COMPUTE_TYPE=int8     # int8 | int8_float16 | float16 | float32
+# WHISPER_LANGUAGE=en         # leave unset for auto-detect
+WHISPER_BEAM_SIZE=5
+```
+
+**How it works:**
+- The model is loaded **eagerly** at app startup (one-time cost), so every recording is fast.
+- On first use, faster-whisper downloads the weights to `~/.cache/huggingface/hub/` (or `/root/.cache/...` when run with `sudo`). Subsequent boots just read from disk — no re-download.
+- Override the cache location with the `HF_HOME` env var if needed.
+
+**Approximate boot time on CPU with `int8`:**
+| Model | Load time |
+|---|---|
+| `tiny` | ~1 s |
+| `base` | ~2–4 s |
+| `small` | ~5–10 s |
+| `medium` | ~15–30 s |
+| `large-v3` | ~30–60 s |
+
+On a CUDA GPU, all sizes load in under ~10 s. `small` + `int8` + CPU is a good starting point for English dictation.
+
+**Install the dependency** (install into the project's venv — not system Python — so the dictation app can find it):
+
+```bash
+# From the project root, with the project's venv:
+./venv/bin/pip install faster-whisper
+```
+
+If you'd rather activate the venv first, this works too:
+
+```bash
+source venv/bin/activate
+pip install faster-whisper
+```
+
+> Don't run `sudo pip install faster-whisper` — that installs into the system environment, not the venv, and the app (run via `sudo venv/bin/python start.py`) won't see it.
 
 #### 6. Vocabulary Correction (`start.py` - `_apply_vocabulary_corrections()`)
 

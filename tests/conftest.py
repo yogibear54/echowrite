@@ -1,5 +1,6 @@
 """Shared fixtures and utilities for tests."""
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Generator
@@ -8,6 +9,13 @@ from unittest.mock import MagicMock, Mock
 import numpy as np
 import pytest
 from scipy.io.wavfile import write as wav_write
+
+
+# Provide a fake faster_whisper module so tests can import providers.local_whisper
+# without requiring the optional faster-whisper package to be installed.
+_fake_faster_whisper = MagicMock()
+_fake_faster_whisper.WhisperModel = MagicMock()
+sys.modules.setdefault('faster_whisper', _fake_faster_whisper)
 
 
 @pytest.fixture
@@ -190,6 +198,33 @@ def replicate_provider(mock_api_token, mock_api_settings):
     os.environ['REPLICATE_API_TOKEN'] = mock_api_token
     
     return ReplicateProvider(api_token=mock_api_token, api_settings=mock_api_settings)
+
+
+@pytest.fixture
+def mock_whisper_settings():
+    """Default settings dict for LocalWhisperProvider."""
+    return {
+        'model_size': 'base',
+        'device': 'cpu',
+        'compute_type': 'int8',
+        'language': None,
+        'beam_size': 5,
+    }
+
+
+@pytest.fixture
+def local_whisper_provider(mock_whisper_settings):
+    """Create a LocalWhisperProvider instance with faster_whisper mocked at module level."""
+    import sys
+    from unittest.mock import MagicMock
+
+    # Ensure faster_whisper is a fake module so the provider can import it
+    fake = MagicMock()
+    fake.WhisperModel = MagicMock(return_value=MagicMock())
+    sys.modules['faster_whisper'] = fake
+
+    from providers.local_whisper import LocalWhisperProvider
+    return LocalWhisperProvider(api_settings=mock_whisper_settings)
 
 
 @pytest.fixture(autouse=True)
