@@ -58,7 +58,43 @@ cp .env.example .env
 
 Get your API token from: <https://replicate.com/account/api-tokens>
 
-For the local Whisper provider (no API key needed), set `TRANSCRIPTION_PROVIDER=local_whisper` in `.env`. See [Local Whisper Integration](#5b-local-whisper-integration-via-localwhisperprovider) for details.
+See [Transcription Providers](#transcription-providers) below for how to choose between Replicate (default) and local Whisper.
+
+### Transcription Providers
+
+EchoWrite supports two providers. Set `TRANSCRIPTION_PROVIDER` in `.env`:
+
+| Provider | Value | API key? | Network? | Best for |
+|---|---|---|---|---|
+| **Replicate** (default) | `replicate` | Yes | Yes | Speed & accuracy without local compute |
+| **Local Whisper** | `local_whisper` | No | First run only | Privacy, offline use, no per-run cost |
+
+#### Using Replicate (default)
+
+Replicate runs the `vaibhavs10/incredibly-fast-whisper` model in the cloud — fast (transcribes 150 minutes of audio in ~100 seconds) and accurate, at ~$0.0036 per run.
+
+1. Get an API token from <https://replicate.com/account/api-tokens>
+2. Set it in `.env`:
+   ```env
+   REPLICATE_API_TOKEN=r8_your_token_here
+   TRANSCRIPTION_PROVIDER=replicate
+   ```
+3. Run `echowrite` — that's it.
+
+**Optional tuning** (defaults are optimized for speed):
+
+```env
+# Model with version tag (the tag is required)
+REPLICATE_MODEL=vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c
+```
+
+Other model parameters (`task`, `language`, `batch_size`, `diarise_audio`) live in `config.py` under `API_SETTINGS` — most users won't need to touch them.
+
+**Privacy:** each recording is uploaded to Replicate for processing. To keep audio on-device, switch to [local Whisper](#5b-local-whisper-integration-via-localwhisperprovider).
+
+#### Using local Whisper
+
+Fully offline, no API key, no per-run cost. Set `TRANSCRIPTION_PROVIDER=local_whisper` in `.env`. See [Local Whisper Integration](#5b-local-whisper-integration-via-localwhisperprovider) for model sizes, device/compute settings, and boot times.
 
 ### Optional: enable autostart on login
 
