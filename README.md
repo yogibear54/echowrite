@@ -134,6 +134,28 @@ I3_STATUS_FILE=/tmp/voice2text_status
 PASTE_KEYS=ctrl,v
 ```
 
+## Uninstallation
+
+To remove everything `./install.sh` created, run the uninstaller from inside the repo:
+
+```bash
+./uninstall.sh
+```
+
+It removes the systemd service, launcher, venv + data dir, the runtime status file, the udev rule, and the uinput module-load config (the last two need `sudo`). It prompts for confirmation first — pass `-y`/`--yes` to skip it:
+
+```bash
+./uninstall.sh -y
+```
+
+Re-running it is safe; it reports "not present" for anything already gone, and everything it removes is restorable by re-running `./install.sh`.
+
+It deliberately leaves shared/system-level things alone and prints the exact commands to remove them yourself:
+
+- Your `input` group membership: `sudo gpasswd -d "$USER" input`
+- System packages (portaudio, xclip, ...) — printed for your package manager
+- Your git checkout of this repo
+
 ## Usage
 
 ```bash
