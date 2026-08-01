@@ -90,25 +90,26 @@ install_system_deps() {
         apt)
             sudo apt-get update
             sudo apt-get install -y \
-                python3 python3-venv python3-pip \
+                python3 python3-venv python3-pip python3-tk \
                 portaudio19-dev \
                 xclip
             ;;
         dnf)
             sudo dnf install -y \
-                python3 python3-devel \
+                python3 python3-devel python3-tkinter \
                 portaudio portaudio-devel \
                 xclip
             ;;
         pacman)
             sudo pacman -S --noconfirm --needed \
-                python \
+                python tk \
                 portaudio \
                 xclip
             ;;
         *)
             error "Unsupported distro. Install these manually and re-run:"
             note "  - python3 (>= ${PYTHON_MIN_MAJOR}.${PYTHON_MIN_MINOR}) with venv and pip"
+            note "  - tkinter (python3-tk / python3-tkinter / tk) — required for paste"
             note "  - PortAudio headers (portaudio19-dev / portaudio-devel / portaudio)"
             note "  - xclip (or xsel)"
             exit 1

@@ -49,6 +49,24 @@ class VoiceDictationTool:
                 self.paste_mode_index = i
                 break
         
+        # Eagerly import pyautogui at startup. pyautogui's dependency
+        # `mouseinfo` calls sys.exit() at import time when tkinter is missing,
+        # which raises SystemExit (a BaseException, NOT caught by
+        # `except Exception`). Importing lazily inside _paste_text meant that
+        # SystemExit escaped up through the keyboard library's event-processing
+        # loop and killed it permanently on the first recording, taking down
+        # ALL hotkeys (Ctrl+Alt, F1/F2/F3, Escape). Import here so a missing
+        # dependency is reported once and paste is simply disabled.
+        self._pyautogui = None
+        try:
+            import pyautogui
+            self._pyautogui = pyautogui
+        except SystemExit as e:
+            print(f"\u26a0\ufe0f  Paste disabled: pyautogui could not be imported ({e}).")
+            print("    On Debian/Ubuntu, fix with: sudo apt-get install python3-tk")
+        except Exception as e:
+            print(f"\u26a0\ufe0f  Paste disabled: pyautogui could not be imported ({e}).")
+
         # Ensure temp directory exists
         self.temp_dir = Path(config.TEMP_DIR)
         self.temp_dir.mkdir(exist_ok=True)
@@ -243,17 +261,22 @@ class VoiceDictationTool:
     
     def _paste_text(self, text: str) -> bool:
         """Copy text to clipboard and paste it."""
+        # Always copy to clipboard first so the text is never lost, even if
+        # the paste keystroke itself fails or pyautogui is unavailable.
         try:
-            # Lazy import pyautogui to avoid X11 connection issues during import
-            import pyautogui
-            
-            # Copy to clipboard
             pyperclip.copy(text)
+        except Exception as e:
+            print(f"⚠️  Failed to copy text to clipboard: {e}")
+            return False
+
+        if self._pyautogui is None:
+            print("⚠️  Paste unavailable (pyautogui not loaded); text copied to clipboard only.")
+            return False
+
+        try:
             time.sleep(0.1)  # Small delay to ensure clipboard is ready
-            
-            # Trigger paste using current mode
             current_mode = self.available_paste_modes[self.paste_mode_index]
-            pyautogui.hotkey(*current_mode)
+            self._pyautogui.hotkey(*current_mode)
             return True
         except Exception as e:
             print(f"⚠️  Failed to paste text: {e}")
