@@ -27,6 +27,7 @@ class VoiceDictationTool:
     
     def __init__(self):
         self.selected_device = None
+        self.selected_samplerate = None  # device's native rate, detected at selection
         self.is_recording = False
         self.recording_thread = None
         self.audio_data = None
@@ -141,13 +142,17 @@ class VoiceDictationTool:
                         # Use default device
                         default_device_id = sd.default.device[0]
                         default_device = sd.query_devices(default_device_id)
-                        print(f"✓ Using default device: [{default_device_id}] {default_device['name']}")
+                        self.selected_samplerate = int(default_device['default_samplerate'])
+                        print(f"✓ Using default device: [{default_device_id}] {default_device['name']}"
+                              f" (sample rate: {self.selected_samplerate} Hz)")
                         return default_device_id
                     
                     selection_num = int(selection)
                     if 1 <= selection_num <= len(input_devices):
                         selected_device_id, selected_device = input_devices[selection_num - 1]
-                        print(f"✓ Selected device: [{selected_device_id}] {selected_device['name']}")
+                        self.selected_samplerate = int(selected_device['default_samplerate'])
+                        print(f"✓ Selected device: [{selected_device_id}] {selected_device['name']}"
+                              f" (sample rate: {self.selected_samplerate} Hz)")
                         return selected_device_id
                     else:
                         print(f"❌ Invalid selection. Please enter a number between 1 and {len(input_devices)}.")
@@ -195,7 +200,9 @@ class VoiceDictationTool:
     def _record_audio(self):
         """Record audio while hotkeys are held."""
         try:
-            sample_rate = config.RECORDING_SETTINGS['sample_rate']
+            # Use the device's native sample rate when known (some mics only
+            # support one rate, e.g. 48000 Hz); fall back to config otherwise.
+            sample_rate = self.selected_samplerate or config.RECORDING_SETTINGS['sample_rate']
             channels = config.RECORDING_SETTINGS['channels']
             dtype = config.RECORDING_SETTINGS['dtype']
             
@@ -309,8 +316,8 @@ class VoiceDictationTool:
             self.status_manager.set_status(Status.IDLE)
             return
         
-        # Calculate duration
-        sample_rate = config.RECORDING_SETTINGS['sample_rate']
+        # Calculate duration (use the same rate the recording captured at)
+        sample_rate = self.selected_samplerate or config.RECORDING_SETTINGS['sample_rate']
         duration = len(self.audio_data) / sample_rate
         
         # Check minimum duration
