@@ -4,6 +4,7 @@ This guide explains how to add new transcription providers to the voice2text app
 
 ## Table of Contents
 
+- [Prerequisites](#prerequisites)
 - [Architecture Overview](#architecture-overview)
 - [Quick Start](#quick-start)
 - [Step-by-Step Guide](#step-by-step-guide)
@@ -14,6 +15,10 @@ This guide explains how to add new transcription providers to the voice2text app
 - [Testing Your Provider](#testing-your-provider)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
+
+## Prerequisites
+
+Set up your environment once with `./install.sh` (see README). The commands below use the venv it creates at `~/.local/share/echowrite/venv/`.
 
 ## Architecture Overview
 

@@ -4,6 +4,7 @@ This guide explains how to add new status indicator plugins to the voice2text ap
 
 ## Table of Contents
 
+- [Prerequisites](#prerequisites)
 - [Architecture Overview](#architecture-overview)
 - [Quick Start](#quick-start)
 - [Step-by-Step Guide](#step-by-step-guide)
@@ -15,6 +16,10 @@ This guide explains how to add new status indicator plugins to the voice2text ap
 - [Testing Your Plugin](#testing-your-plugin)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
+
+## Prerequisites
+
+Set up your environment once with `./install.sh` (see README). The commands below use the venv it creates at `~/.local/share/echowrite/venv/`.
 
 ## Architecture Overview
 
