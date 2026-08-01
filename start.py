@@ -78,6 +78,14 @@ class VoiceDictationTool:
                 print(f"✓ i3 status plugin enabled (status file: {config.I3_STATUS_FILE})")
             except Exception as e:
                 print(f"⚠️  Failed to initialize i3 status plugin: {e}")
+        if 'gnome' in config.STATUS_PLUGINS:
+            try:
+                from plugins.gnome import GnomeStatusPlugin
+                gnome_plugin = GnomeStatusPlugin(config.GNOME_ICON_SIZE)
+                self.status_manager.register_plugin(gnome_plugin)
+                print(f"✓ GNOME status plugin enabled (icon size: {config.GNOME_ICON_SIZE})")
+            except Exception as e:
+                print(f"⚠️  Failed to initialize GNOME status plugin: {e}")
     
     def select_audio_device(self) -> Optional[int]:
         """Interactive device selection at startup."""

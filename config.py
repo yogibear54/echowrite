@@ -120,5 +120,8 @@ STATUS_PLUGINS = [p.strip() for p in STATUS_PLUGINS if p.strip()]
 # i3 status plugin configuration
 I3_STATUS_FILE = _get_str_env('I3_STATUS_FILE', '/tmp/voice2text_status')
 
+# GNOME top-bar (system tray) plugin configuration
+GNOME_ICON_SIZE = int(_get_str_env('GNOME_ICON_SIZE', '64'))
+
 # Paste key configuration (format: 'key1,key2,...' e.g., 'ctrl,v' or 'ctrl,shift,v')
 PASTE_KEYS = 'ctrl,v'
