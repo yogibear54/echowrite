@@ -1,4 +1,5 @@
-keyboard==0.13.5
+# keyboard is vendored as a patched fork — installed separately by install.sh
+# from ./vendor/keyboard (see vendor/keyboard/README.md for why).
 sounddevice==0.4.7
 scipy==1.11.4
 replicate==0.34.0

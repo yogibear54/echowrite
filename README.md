@@ -23,86 +23,56 @@ A local Python application that captures voice input via global hotkeys, transcr
 
 ## Requirements
 
-### System Requirements
-
-- Python 3.8 or higher
-- Linux (tested)
-- Microphone access
-- Internet connection (for Replicate API)
-
-### System Dependencies
-
-#### Linux (Debian/Ubuntu)
-
-```bash
-sudo apt-get update
-sudo apt-get install portaudio19-dev python3-dev
-sudo apt-get install xclip  # Required for clipboard functionality
-```
-
-#### Other platforms
-
-macOS and Windows have not been tested and are not supported in the current release.
-
-### Python Dependencies
-
-All Python dependencies are listed in `requirements.txt`:
-
-```
-keyboard==0.13.5          # Global hotkey detection
-sounddevice==0.4.7        # Audio recording
-scipy==1.11.4             # Audio file processing
-replicate==0.34.0          # Replicate API client
-pyperclip==1.8.2          # Clipboard operations
-pyautogui==0.9.54         # Auto-paste functionality
-python-dotenv==1.0.0      # Environment variable management
-requests>=2.31.0          # HTTP requests for file upload
-
-# Testing dependencies
-pytest>=7.4.0             # Testing framework
-pytest-mock>=3.11.0       # Enhanced mocking capabilities
-pytest-cov>=4.1.0         # Code coverage reporting
-pytest-timeout>=2.1.0     # Prevent hanging tests
-responses>=0.23.0         # Mock HTTP requests
-```
+- Linux (apt, dnf, or pacman)
+- Python 3.10 or higher
+- A microphone
+- **No `sudo` required** for the dictation app itself — see [Why a vendored `keyboard` library?](#why-a-vendored-keyboard-library) below
 
 ## Installation
 
-1. **Clone or download this repository**
-
-2. **Create a virtual environment** (recommended):
+One command, from inside the repo:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+./install.sh
 ```
 
-3. **Install Python dependencies**:
+That's it. The installer:
 
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+1. Detects your package manager (apt / dnf / pacman) and installs system deps: `portaudio`, `xclip`, `python3-venv`
+2. Drops a udev rule so the `input` group can read `/dev/input/event*` and write `/dev/uinput` — no root needed for global hotkeys
+3. Adds your user to the `input` group (you'll need to **log out and back in** for this to take effect)
+4. Loads the `uinput` kernel module
+5. Creates a Python venv at `~/.local/share/echowrite/venv/` and installs the project requirements
+6. Installs a vendored, patched fork of `boppreh/keyboard` from `vendor/keyboard/`
+7. Drops a `~/.local/bin/echowrite` launcher on your PATH
+8. Installs a systemd user service at `~/.config/systemd/user/echowrite.service` (not enabled — opt in below)
 
-4. **Create `.env` file**:
+Re-run `./install.sh` any time to repair the install or pick up new dependencies after `git pull`.
+
+### Configure `.env`
 
 ```bash
 cp .env.example .env
+# then edit .env and set REPLICATE_API_TOKEN
 ```
 
-5. **Configure your `.env` file**:
+Get your API token from: <https://replicate.com/account/api-tokens>
 
-Edit `.env` and add your Replicate API token:
+For the local Whisper provider (no API key needed), set `TRANSCRIPTION_PROVIDER=local_whisper` in `.env`. See [Local Whisper Integration](#5b-local-whisper-integration-via-localwhisperprovider) for details.
 
-```env
-REPLICATE_API_TOKEN=r8_your_api_token_here
+### Optional: enable autostart on login
+
+The systemd service is installed but not enabled, so `echowrite` only runs when you start it manually. To have it start automatically on login:
+
+```bash
+systemctl --user enable --now echowrite
 ```
 
-Get your API token from: https://replicate.com/account/api-tokens
+To disable later: `systemctl --user disable --now echowrite`
 
-### Optional Environment Variables
+### Optional `.env` variables
 
-You can customize the application behavior by setting these variables in `.env`:
+All of these are read at startup; the defaults work fine for most users.
 
 ```env
 # Maximum recording duration in minutes (default: 5.0, range: 0.1-60.0)
@@ -112,74 +82,46 @@ MAX_RECORDING_MINUTES=5
 SAMPLE_RATE=44100
 
 # Replicate model name with version tag
-# Default: vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c
 REPLICATE_MODEL=vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c
 
 # Minimum recording duration in seconds (default: 1.0, min: 0.1)
 MIN_RECORDING_SECONDS=1.0
 
 # Status indicator plugins (comma-separated, default: i3status)
-# Available: i3status
 STATUS_PLUGINS=i3status
 
 # i3 status bar plugin configuration
-# Path to status file that i3bar will read (default: /tmp/voice2text_status)
 I3_STATUS_FILE=/tmp/voice2text_status
 
 # Paste key configuration (default: ctrl,v)
-# Format: comma-separated keys, e.g., 'ctrl,v' or 'ctrl,shift,v' or 'ctrl,insert'
-# Available modes: ctrl+v (standard), ctrl+shift+v (terminal), ctrl+insert (alternative)
+# Format: comma-separated keys: 'ctrl,v' | 'ctrl,shift,v' | 'ctrl,insert'
 PASTE_KEYS=ctrl,v
 ```
 
 ## Usage
 
-1. **Activate the virtual environment** (if not already activated):
-
 ```bash
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+echowrite
 ```
 
-2. **Run the application**:
+That's it — no `sudo`, no `source venv/bin/activate`, nothing. The `~/.local/bin/echowrite` launcher runs the venv's Python on `start.py` directly.
 
-**On Linux** (requires `sudo` for global keyboard hotkey access):
+On first run you'll be prompted to pick an audio input device (or press Enter for default). After that:
 
-Option 1 - Use the helper script (recommended):
-```bash
-./run.sh
-```
-**Note:** The `run.sh` script requires `sudo` privileges. It will prompt you for your password to run the application with root permissions, which are necessary for global keyboard hotkey detection on Linux.
+1. **Position your cursor** in the desired text field (any application)
+2. **Press and hold Ctrl+Alt** to start recording
+3. **Speak your text**
+4. **Release Ctrl+Alt** to stop recording and process
+5. **Press Escape** during recording to cancel and discard without processing
+6. The transcribed text will automatically appear at your cursor position
 
-Option 2 - Use sudo with venv Python directly:
-```bash
-sudo venv/bin/python start.py
-```
+**Paste mode switching** (works at runtime, no restart needed):
 
-Option 3 - Activate venv first, then use sudo:
-```bash
-source venv/bin/activate
-sudo $(which python) start.py
-```
+- **F1** — next paste mode (e.g., Ctrl+V → Ctrl+Shift+V for terminals)
+- **F2** — previous paste mode
+- **F3** — display current paste mode
 
-**Note**: On Linux, the `keyboard` library requires root permissions for global hotkey detection. Use `sudo` with the full path to your virtual environment's Python interpreter (`venv/bin/python`) to ensure it uses the correct Python and installed packages. Other operating systems are not currently supported or tested.
-
-3. **Select your audio input device** when prompted (or press Enter for default)
-
-4. **Start dictating**:
-   - Position your cursor in the desired text field (any application)
-   - Press and **hold** Ctrl+Alt to start recording
-   - Speak your text
-   - **Release** Ctrl+Alt to stop recording and process
-   - Press **Escape** during recording to cancel and discard without processing
-   - The transcribed text will automatically appear at your cursor position
-
-5. **Change paste mode for different applications**:
-   - Default paste mode: **Ctrl+V** (works in most applications)
-   - Press **F1** to switch to next paste mode (e.g., **Ctrl+Shift+V** for terminals)
-   - Press **F2** to cycle backward through modes
-   - Press **F3** to display current paste mode
-
-6. **Exit the application**: Press Ctrl+C in the terminal
+**Exit:** press Ctrl+C in the terminal where `echowrite` is running.
 
 ## Architecture & Implementation
 
@@ -324,7 +266,7 @@ WHISPER_BEAM_SIZE=5
 
 **How it works:**
 - The model is loaded **eagerly** at app startup (one-time cost), so every recording is fast.
-- On first use, faster-whisper downloads the weights to `~/.cache/huggingface/hub/` (or `/root/.cache/...` when run with `sudo`). Subsequent boots just read from disk — no re-download.
+- On first use, faster-whisper downloads the weights to `~/.cache/huggingface/hub/`. Subsequent boots just read from disk — no re-download.
 - Override the cache location with the `HF_HOME` env var if needed.
 
 **Approximate boot time on CPU with `int8`:**
@@ -338,21 +280,11 @@ WHISPER_BEAM_SIZE=5
 
 On a CUDA GPU, all sizes load in under ~10 s. `small` + `int8` + CPU is a good starting point for English dictation.
 
-**Install the dependency** (install into the project's venv — not system Python — so the dictation app can find it):
+**Install the dependency** — `install.sh` already installs `faster-whisper` from `requirements.txt` into the venv at `~/.local/share/echowrite/venv/`, so you don't need to do anything extra. If you ever need to install it manually (e.g. into a fresh venv):
 
 ```bash
-# From the project root, with the project's venv:
-./venv/bin/pip install faster-whisper
+~/.local/share/echowrite/venv/bin/pip install faster-whisper
 ```
-
-If you'd rather activate the venv first, this works too:
-
-```bash
-source venv/bin/activate
-pip install faster-whisper
-```
-
-> Don't run `sudo pip install faster-whisper` — that installs into the system environment, not the venv, and the app (run via `sudo venv/bin/python start.py`) won't see it.
 
 #### 6. Vocabulary Correction (`start.py` - `_apply_vocabulary_corrections()`)
 
@@ -551,38 +483,43 @@ The plugin system is designed to be extensible - you can create plugins for:
 ## Project Structure
 
 ```
-voice2text/
+echowrite/
 ├── start.py              # Main application script (VoiceDictationTool class)
 ├── config.py             # Configuration settings with env variable support
-├── status_manager.py      # Status manager for tracking and broadcasting application state
+├── status_manager.py     # Status manager for tracking and broadcasting application state
 ├── providers/            # Transcription provider implementations
 │   ├── __init__.py       # Provider factory
 │   ├── base.py           # Abstract base provider class
-│   └── replicate.py      # Replicate provider implementation
+│   ├── replicate.py      # Replicate provider implementation
+│   └── local_whisper.py  # Local faster-whisper provider (no API key needed)
 ├── plugins/              # Status indicator plugins directory
 │   ├── __init__.py       # Plugin package initialization
 │   ├── base.py           # Base class for status indicator plugins
-│   └── i3status/         # i3 status bar plugin
-│       ├── __init__.py
-│       └── README.md
+│   ├── i3status/         # i3 status bar plugin
+│   │   ├── __init__.py
+│   │   └── README.md
+│   └── gnome/            # GNOME top-bar (AppIndicator) plugin
 ├── tests/                # Test suite
 │   ├── conftest.py       # Shared test fixtures
-│   ├── test_providers/    # Provider tests
-│   ├── test_audio/        # Audio recording tests
+│   ├── test_providers/   # Provider tests
+│   ├── test_audio/       # Audio recording tests
+│   ├── test_plugins/     # Plugin tests
 │   ├── test_integration/ # Integration tests
 │   └── fixtures/         # Test data and audio files
+├── install.sh            # One-shot installer (deps, udev, venv, launcher, systemd)
+├── vendor/
+│   └── keyboard/         # Patched fork of boppreh/keyboard (see below)
 ├── requirements.txt      # Python dependencies
-├── pytest.ini           # Pytest configuration
+├── pytest.ini            # Pytest configuration
 ├── .env.example          # Example environment variables file
 ├── .env                  # Your environment variables (create from .env.example)
 ├── .gitignore            # Git ignore rules
-├── run.sh                # Helper script for Linux (requires sudo for global hotkeys)
-├── run_tests.sh          # Helper script to run pytest with virtual environment
 ├── recordings.json       # Transcription history (created automatically)
 ├── temp/                 # Temporary audio files directory
-├── venv/                 # Virtual environment (created during setup)
 ├── NEW_PROVIDERS.md      # Developer guide for creating new transcription providers
 ├── NEW_STATUS_PLUGINS.md # Developer guide for creating new status plugins
+├── PASTE_MODES.md        # Paste mode reference
+├── LOTUS_WORK.md         # Project work log / design notes
 └── README.md             # This file
 ```
 
@@ -596,8 +533,8 @@ voice2text/
   - **`i3status/`**: Plugin for i3 status bar integration
 - **`NEW_PROVIDERS.md`**: Comprehensive developer guide for implementing new transcription providers
 - **`NEW_STATUS_PLUGINS.md`**: Comprehensive developer guide for implementing new status indicator plugins
-- **`run.sh`**: Helper script for Linux that automatically uses sudo with the correct Python path. **Requires sudo privileges** - it will prompt for your password to enable global keyboard hotkey detection.
-- **`run_tests.sh`**: Helper script that automatically runs pytest using the virtual environment's Python interpreter. This ensures tests use the correct Python environment and dependencies without requiring manual activation of the venv.
+- **`install.sh`**: One-shot installer. Detects distro, installs system deps, sets up udev rules + `input` group, creates the venv, installs requirements + the vendored `keyboard` library, drops a launcher on PATH, and installs a systemd user service. **Run this once after cloning.**
+- **`vendor/keyboard/`**: Vendored fork of `boppreh/keyboard` with a 2-line patch (see [below](#why-a-vendored-keyboard-library)).
 - **`recordings.json`**: JSON file storing all transcription history with timestamps
 - **`temp/`**: Directory for temporary WAV files (automatically cleaned up after processing)
 
@@ -615,17 +552,28 @@ sudo apt-get install portaudio19-dev
 brew install portaudio
 ```
 
-### "Permission denied" for Keyboard Access (Linux)
+### Hotkeys not working after install (Linux)
 
-The `keyboard` library requires root permissions on Linux for global hotkey detection. Use the helper script or run with sudo:
+The installer adds your user to the `input` group, but group memberships only apply to sessions started *after* the change. If `echowrite` is silently failing to detect keypresses:
 
 ```bash
-./run.sh
-# or
-sudo venv/bin/python start.py
+# Check if input is in your effective groups
+id -nG | grep -w input || echo "not in input group — log out and back in"
 ```
 
-**Important**: Always use the full path to the venv Python (`venv/bin/python`) when using sudo, as sudo runs with root's environment which doesn't have your virtual environment activated.
+If it's not there, **log out and log back in** (or `reboot` if you're on a session you can't easily restart). Run `echowrite` again from your desktop session.
+
+If `input` *is* in your groups and hotkeys still don't work, check that the udev rule is in place:
+
+```bash
+cat /etc/udev/rules.d/99-echowrite-input.rules
+ls -l /dev/uinput  # should show group=input, mode=0660
+sudo udevadm control --reload-rules && sudo udevadm trigger  # re-apply if missing
+```
+
+### "You must be root to use this library on linux." (very old installs)
+
+If you ran `echowrite` from an install done before the vendored `keyboard` library was added, you may have the upstream `keyboard` package that requires root. Re-run `./install.sh` to overlay the vendored copy into your venv.
 
 ### "Invalid input sample format" Error
 
@@ -686,20 +634,6 @@ Recordings must be at least 1 second long (configurable via `MIN_RECORDING_SECON
 ### Maximum Recording Duration Reached
 
 The default maximum is 5 minutes. Adjust `MAX_RECORDING_MINUTES` in your `.env` file if you need longer recordings. The recording will automatically stop when the limit is reached.
-
-### "Command not found" when using sudo
-
-When using `sudo`, it runs with root's environment which doesn't have your virtual environment activated. Always use:
-
-```bash
-sudo venv/bin/python start.py
-```
-
-Or use the helper script (requires sudo):
-```bash
-./run.sh
-```
-**Note:** The `run.sh` script will prompt for your sudo password to enable global keyboard hotkey detection.
 
 ### Status Indicator Not Showing in i3 Bar
 
@@ -800,12 +734,30 @@ The application uses a provider-based architecture for transcription:
 
 ## Limitations
 
-- Requires active internet connection for transcription
-- On Linux, requires `sudo` for global hotkey detection
+- Requires active internet connection for transcription (unless using the local Whisper provider)
+- Linux only (tested on apt, dnf, and pacman-based distros)
 - Maximum recording duration is configurable but recommended to keep under 5 minutes for optimal performance
 - Transcription accuracy depends on audio quality and clarity of speech
 - Replicate API has rate limits (check your account limits)
-- Audio files are temporarily uploaded to Replicate (privacy consideration)
+- Audio files are temporarily uploaded to Replicate when using the Replicate provider (privacy consideration — use the local Whisper provider to keep audio on-device)
+
+## Why a vendored `keyboard` library?
+
+The `boppreh/keyboard` package on PyPI does this on Linux:
+
+```python
+def ensure_root():
+    if os.geteuid() != 0:
+        raise ImportError('You must be root to use this library on linux.')
+```
+
+It refuses to load unless the process is root — even when `/dev/uinput` is accessible to the user via group permissions. This makes the "no sudo" install flow impossible with the upstream package.
+
+The fix is a 2-line patch in `vendor/keyboard/keyboard/_nixcommon.py` that neuters the check. The patched fork is installed into the venv by `install.sh` *after* `pip install -r requirements.txt`, so it overrides the PyPI version.
+
+There's a second, smaller patch in `vendor/keyboard/keyboard/_nixkeyboard.py` that makes `build_tables()` tolerant of `dumpkeys` failing. This happens in sessions with no controlling TTY (some SSH/container scenarios). The patch swaps in a hardcoded keycode→name map for the keys echowrite actually needs.
+
+These are the only Linux changes — the macOS files are untouched. See `vendor/keyboard/README.md` for the patch details, the license, and how to update from upstream.
 
 ## Future Development Ideas
 
@@ -838,7 +790,7 @@ The application uses a provider-based architecture for transcription:
 
 ### Known Issues & Workarounds
 
-1. **Linux Sudo Requirement**: Worked around by using full path to venv Python
+1. **Linux Sudo Requirement**: Resolved by the vendored `keyboard` fork + `input` group + udev rules — no `sudo` needed for the app
 2. **Audio Format Compatibility**: Resolved by using float32 instead of float64
 3. **File Upload Format**: Required using 'content' field name, not 'file'
 4. **Model Version**: Must include specific commit hash version tag
@@ -849,33 +801,23 @@ The project includes a comprehensive test suite using pytest. All tests use prop
 
 ### Running Tests
 
-First, ensure test dependencies are installed:
+The installer drops a venv at `~/.local/share/echowrite/venv/`. From the repo root, run pytest from there:
 
 ```bash
-source venv/bin/activate
-pip install -r requirements.txt
+~/.local/share/echowrite/venv/bin/pytest
 ```
 
-**Recommended**: Use the helper script to automatically use the virtual environment's pytest:
+Or activate the venv first:
 
 ```bash
-./run_tests.sh
-```
-
-Alternatively, you can activate the virtual environment and run pytest directly:
-
-```bash
-source venv/bin/activate
+source ~/.local/share/echowrite/venv/bin/activate
 pytest
 ```
 
+All examples below assume pytest is on your `PATH` (i.e. the venv is activated or you've aliased it).
+
 #### Run All Tests
 
-```bash
-./run_tests.sh
-```
-
-Or with activated venv:
 ```bash
 pytest
 ```
@@ -883,32 +825,17 @@ pytest
 #### Run Only Unit Tests (Fast, No Network Required)
 
 ```bash
-./run_tests.sh -m "not integration"
-```
-
-Or with activated venv:
-```bash
 pytest -m "not integration"
 ```
 
 #### Run Integration Tests (Requires Network/API Token)
 
 ```bash
-./run_tests.sh -m integration
-```
-
-Or with activated venv:
-```bash
 pytest -m integration
 ```
 
 #### Run Tests with Coverage Report
 
-```bash
-./run_tests.sh --cov=providers --cov=start --cov=status_manager --cov=plugins --cov-report=html
-```
-
-Or with activated venv:
 ```bash
 pytest --cov=providers --cov=start --cov=status_manager --cov=plugins --cov-report=html
 ```
@@ -918,31 +845,15 @@ This generates an HTML coverage report in `htmlcov/index.html`.
 #### Run Specific Test Files
 
 ```bash
-# Test providers only
-./run_tests.sh tests/test_providers/
-
-# Test audio functionality only
-./run_tests.sh tests/test_audio/
-
-# Test status plugins only
-./run_tests.sh tests/test_plugins/
-
-# Test integration/workflow only
-./run_tests.sh tests/test_integration/
-
-# Run a specific test file
-./run_tests.sh tests/test_providers/test_replicate.py
+pytest tests/test_providers/       # provider tests
+pytest tests/test_audio/           # audio recording tests
+pytest tests/test_plugins/         # status plugin tests
+pytest tests/test_integration/     # end-to-end workflow tests
+pytest tests/test_providers/test_replicate.py    # one specific file
 ```
-
-Or with activated venv, use `pytest` instead of `./run_tests.sh`.
 
 #### Verbose Output
 
-```bash
-./run_tests.sh -v
-```
-
-Or with activated venv:
 ```bash
 pytest -v
 ```
@@ -1075,6 +986,6 @@ For issues, questions, or contributions, please refer to the project repository.
 
 ---
 
-**Last Updated**: January 2025
-**Version**: 1.0.0
+**Last Updated**: August 2026
+**Version**: 1.1.0
 **Status**: Production Ready

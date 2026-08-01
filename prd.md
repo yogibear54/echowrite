@@ -73,7 +73,7 @@ Create a local Python script that captures voice input via global hotkeys, trans
 
 ## Tech Stack
 
-keyboard==0.13.5
+keyboard==0.13.5 (vendored as a patched fork at `vendor/keyboard/` — see README for the why)
 sounddevice==0.4.7
 scipy==1.11.4
 replicate==0.34.0
@@ -81,7 +81,7 @@ pyperclip==1.8.2
 pyautogui==0.9.54
 python-dotenv==1.0.0
 
-**Note:** Version numbers are current as of documentation review. Check PyPI for latest versions during implementation. 
+**Note:** The current install flow is `./install.sh` (see README), not the manual pip command below. The tech stack list above is for reference only.
 
 ----------
 
@@ -103,13 +103,8 @@ voice_dictation/
 
 Install via pip:
 
-```bash
-pip install keyboard sounddevice scipy replicate pyperclip pyautogui python-dotenv
-
-```
-
 **Platform-specific requirements:**
-- **Linux**: May require `sudo` for keyboard global hotkeys. Install `xclip` or `xsel` for pyperclip: `sudo apt-get install xclip`
+- **Linux**: Install `xclip` (or `xsel`) for pyperclip: `sudo apt-get install xclip`. Global hotkeys no longer require `sudo` — the `install.sh` script sets up udev rules + the `input` group, and the `keyboard` library is vendored as a no-root-check fork (see README).
 - **macOS**: No additional requirements
 - **Windows**: No additional requirements
 ## Configuration Options
@@ -228,7 +223,7 @@ Note: if recording is less than 1 second, it should not be sent via API
 -   **Network issues**: Retry logic with user notification
 -   **Audio recording fails**: Fallback options and troubleshooting
 -   **Replicate API errors**: Handle prediction failures and rate limits gracefully
--   **Permission errors (Linux)**: Inform user about sudo requirement for global hotkeys
+-   **Permission errors (Linux)**: Global hotkeys no longer need root. If hotkeys aren't detected, the most common cause is that the user wasn't logged out/back in after `install.sh` added them to the `input` group — `id -nG | grep -w input` to verify.
 -   **Clipboard errors**: Fallback to transcription persistence if clipboard operations fail
 
 ----------
@@ -243,7 +238,7 @@ Note: if recording is less than 1 second, it should not be sent via API
 -   Use vaibhavs10/incredibly-fast-whisper model which is incredibly fast (transcribes 150 minutes in ~100 seconds) and cost-effective (~$0.0036 per run)
 -   Authenticate with Replicate by setting the REPLICATE_API_TOKEN environment variable (see https://replicate.com/account/api-tokens)
 -   **Library Usage Notes:**
-    - **keyboard**: Use `keyboard.on_press_key()` or `keyboard.add_hotkey()` for global hotkey detection. On Linux, may require root permissions.
+    - **keyboard**: Use `keyboard.on_press_key()` or `keyboard.add_hotkey()` for global hotkey detection. The library is vendored as a no-root-check fork at `vendor/keyboard/` so it works on Linux without `sudo` (provided the `input` group / udev rules from `install.sh` are in place).
     - **sounddevice**: Use `sd.rec()` for simple recording or `sd.InputStream()` with callbacks for real-time processing. Check `sd.query_devices()` for available microphones.
     - **scipy.io.wavfile**: Use `write(filename, sample_rate, data)` where data is int16 numpy array. More reliable than built-in `wave` module.
     - **replicate**: Pass local files using `open("file.wav", "rb")`. Output for transcription models is a string.
