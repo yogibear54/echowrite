@@ -259,8 +259,9 @@ main() {
     info "Next steps:"
     note "1. If you were added to the 'input' group, log out and back in (or run: exec \$SHELL)."
     note "2. Run \`echowrite\` to start the tool."
-    note "3. Optional autostart:  systemctl --user enable --now $SERVICE_NAME"
-    note "4. To update later:    git pull && ./install.sh"
+    note "3. Optional status-bar plugins (i3 / GNOME): ./setup_plugins.sh"
+    note "4. Optional autostart:  systemctl --user enable --now $SERVICE_NAME"
+    note "5. To update later:    git pull && ./install.sh"
     echo
 }
 
