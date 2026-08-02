@@ -82,8 +82,11 @@ WHISPER_SETTINGS = {
     'beam_size': _get_int_env('WHISPER_BEAM_SIZE', 5, min_val=1, max_val=10),
 }
 
-# Hotkey configuration
-HOTKEY = 'ctrl+alt'
+# Hotkey configuration (overridable via HOTKEY env var).
+# Recording starts when ALL keys are held down, stops when any is released.
+# Format: keys joined by '+' (e.g. 'ctrl+alt', 'ctrl+shift', 'f4').
+# Left/right variants of modifiers are treated as equivalent.
+HOTKEY = _get_str_env('HOTKEY', 'ctrl+alt')
 
 # Custom vocabulary for better recognition
 CUSTOM_VOCABULARY = {
