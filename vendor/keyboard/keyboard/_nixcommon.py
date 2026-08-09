@@ -69,6 +69,16 @@ class EventDevice(object):
                     # power buttons, etc.) commonly aren't readable by the
                     # user even with correct input-group setup.
                     exit()
+                # Any other open() failure (ENOENT/ENODEV — device
+                # unplugged, suspend/resume, or a keyboard-class device that
+                # can't be opened, e.g. a power/sleep button) must re-raise
+                # so start_reading's `except OSError` recovery runs (it calls
+                # close_input_file() and backs off). Previously this fell
+                # through and left _input_file == None, making read_event()
+                # crash the reader thread with 'NoneType' object has no
+                # attribute 'read' (an uncaught AttributeError), silently
+                # disabling all hotkeys.
+                raise
 
             def try_close():
                 try:

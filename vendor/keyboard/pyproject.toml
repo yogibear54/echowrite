@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keyboard"
-version = "0.13.5+echowrite.2"
+version = "0.13.5+echowrite.3"
 description = "Hook and simulate keyboard events on Windows and Linux (echowrite-patched fork)"
 readme = "README.md"
 license = {text = "MIT"}
