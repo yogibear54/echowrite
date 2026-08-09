@@ -2,7 +2,7 @@
 import struct
 import os
 import atexit
-from time import time as now
+from time import time as now, sleep
 from threading import Thread
 from glob import glob
 try:
@@ -85,6 +85,21 @@ class EventDevice(object):
             atexit.register(self._output_file.close)
         return self._output_file
 
+    def close_input_file(self):
+        """Close the input fd and reset it so the next access reopens it.
+
+        Used by the reader loop when the underlying device disappears
+        (e.g. after suspend/resume or USB autosuspend) and read() raises
+        ENODEV. The lazy input_file property reopens the node on the next
+        read_event() call, which is how we recover without losing hotkeys.
+        """
+        if self._input_file is not None:
+            try:
+                self._input_file.close()
+            except OSError:
+                pass
+            self._input_file = None
+
     def read_event(self):
         data = self.input_file.read(struct.calcsize(event_bin_format))
         seconds, microseconds, type, code, value = struct.unpack(event_bin_format, data)
@@ -109,7 +124,21 @@ class AggregatedEventDevice(object):
         self.output = output or self.devices[0]
         def start_reading(device):
             while True:
-                self.event_queue.put(device.read_event())
+                try:
+                    self.event_queue.put(device.read_event())
+                except OSError:
+                    # ENODEV (errno 19): the input device backing this fd
+                    # disappeared — typically after suspend/resume, USB
+                    # autosuspend, or a BT/unplug. Upstream lets this kill
+                    # the reader thread, which silently breaks all hotkeys
+                    # (AggregatedEventDevice then blocks forever on an
+                    # empty queue). Instead, close the stale fd so the next
+                    # read reopens the node, and back off until the device
+                    # reappears. Permission-denied still raises SystemExit
+                    # (via the input_file property) and skips the device as
+                    # before.
+                    device.close_input_file()
+                    sleep(1.0)
         for device in self.devices:
             thread = Thread(target=start_reading, args=[device])
             thread.setDaemon(True)
