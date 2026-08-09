@@ -31,8 +31,17 @@ class VoiceDictationTool:
         self.is_recording = False
         self.recording_thread = None
         self.audio_data = None
-        self.ctrl_pressed = False
-        self.alt_pressed = False
+        # Recording hotkey (configurable via HOTKEY env var; default 'ctrl+alt').
+        # Stored as a set of normalized key names; left/right modifier variants
+        # (e.g. 'left ctrl') are treated as equivalent to 'ctrl'.
+        self.hotkey_keys = {self._normalize_key(k)
+                            for k in config.HOTKEY.split('+') if k.strip()}
+        self.hotkey_label = ' + '.join(
+            k.strip().title() for k in config.HOTKEY.split('+') if k.strip())
+        self.pressed_hotkeys = set()
+        if not self.hotkey_keys:
+            print("\u26a0\ufe0f  Warning: HOTKEY is empty or invalid \u2014 recording will not work.")
+            print("    Set HOTKEY in your .env (e.g. HOTKEY=ctrl+alt).")
         self.recording_start_time = None
         self.is_cancelled = False
         
@@ -368,12 +377,23 @@ class VoiceDictationTool:
             # Reset status to idle
             self.status_manager.set_status(Status.IDLE)
     
+    @staticmethod
+    def _normalize_key(name: str) -> str:
+        """Normalize a key name so config and events match.
+
+        Lowercases and strips 'left '/'right ' prefixes, so 'left ctrl' and
+        'right ctrl' both match a config value of 'ctrl'.
+        """
+        name = (name or '').strip().lower()
+        for prefix in ('left ', 'right '):
+            if name.startswith(prefix):
+                return name[len(prefix):]
+        return name
+
     def _on_key_event(self, event):
         """Handle keyboard events for hotkey detection."""
-        # Normalize key names
         key_name = event.name.lower() if event.name else ''
-        is_ctrl = key_name in ['ctrl', 'left ctrl', 'right ctrl']
-        is_alt = key_name in ['alt', 'left alt', 'right alt']
+        normalized = self._normalize_key(key_name)
         # Check for escape key with multiple possible names (Linux may use 'esc' instead of 'escape')
         is_escape = key_name in ['escape', 'esc']
         # Check for function keys for paste mode control
@@ -409,17 +429,18 @@ class VoiceDictationTool:
                     self.recording_thread.join(timeout=2.0)
                 return
             
-            if is_ctrl:
-                self.ctrl_pressed = True
-            elif is_alt:
-                self.alt_pressed = True
+            if normalized in self.hotkey_keys:
+                self.pressed_hotkeys.add(normalized)
             
-            # Start recording when both keys are pressed
-            if self.ctrl_pressed and self.alt_pressed and not self.is_recording:
+            # Start recording when all configured hotkey keys are held
+            if (self.hotkey_keys
+                    and self.hotkey_keys <= self.pressed_hotkeys
+                    and not self.is_recording):
                 self.is_recording = True
                 self.is_cancelled = False  # Reset cancellation flag for new recording
                 self.recording_start_time = time.time()
-                print("🔴 Recording started... (Release Ctrl+Alt to stop, or press Escape to cancel)")
+                print(f"🔴 Recording started... (Release {self.hotkey_label} to stop, "
+                      "or press Escape to cancel)")
                 self.status_manager.set_status(Status.RECORDING)
                 
                 # Start recording in a separate thread
@@ -431,17 +452,15 @@ class VoiceDictationTool:
             if is_f1 or is_f2 or is_f3:
                 print("\r\x1b[2K", end="", flush=True)  # Clear entire line
                 return
-            if is_ctrl:
-                self.ctrl_pressed = False
-            elif is_alt:
-                self.alt_pressed = False
+            if normalized in self.hotkey_keys:
+                self.pressed_hotkeys.discard(normalized)
             
             # Reset cancellation flag if keys are released after cancellation
             if self.is_cancelled and not self.is_recording:
                 self.is_cancelled = False
             
-            # Stop recording when either key is released
-            if self.is_recording and (not self.ctrl_pressed or not self.alt_pressed):
+            # Stop recording when any configured hotkey key is released
+            if self.is_recording and not (self.hotkey_keys <= self.pressed_hotkeys):
                 self.is_recording = False
                 
                 # Wait for recording thread to finish
@@ -478,8 +497,8 @@ class VoiceDictationTool:
             return
         
         print("\n" + "=" * 60)
-        print("✓ Ready! Press and hold Ctrl+Alt to start recording.")
-        print("  Release Ctrl+Alt to stop recording and transcribe.")
+        print(f"✓ Ready! Press and hold {self.hotkey_label} to start recording.")
+        print(f"  Release {self.hotkey_label} to stop recording and transcribe.")
         print("  Press Escape during recording to cancel.")
         print(f"  Current paste mode: {self.get_current_paste_mode()}")
         print("  Press F1/F2 to cycle through paste modes.")

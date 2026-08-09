@@ -299,7 +299,7 @@ class TestAudioRecording:
         ctrl_up_event = MagicMock()
         ctrl_up_event.name = 'ctrl'
         ctrl_up_event.event_type = keyboard.KEY_UP
-        voice_tool.ctrl_pressed = False
+        voice_tool.pressed_hotkeys = {'ctrl', 'alt'}
         
         # Process key up event
         voice_tool._on_key_event(ctrl_up_event)
@@ -352,15 +352,14 @@ class TestAudioRecording:
         ctrl_up_event = MagicMock()
         ctrl_up_event.name = 'ctrl'
         ctrl_up_event.event_type = keyboard.KEY_UP
-        voice_tool.ctrl_pressed = False
+        voice_tool.pressed_hotkeys = {'ctrl', 'alt'}
         voice_tool._on_key_event(ctrl_up_event)
         
         # Verify cancellation flag is reset
         assert voice_tool.is_cancelled is False
         
         # Start a new recording
-        voice_tool.ctrl_pressed = True
-        voice_tool.alt_pressed = True
+        voice_tool.pressed_hotkeys = {'ctrl', 'alt'}
         ctrl_down_event = MagicMock()
         ctrl_down_event.name = 'ctrl'
         ctrl_down_event.event_type = keyboard.KEY_DOWN
